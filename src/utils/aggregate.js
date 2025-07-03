@@ -1,29 +1,28 @@
-export function aggregate(entries) {
-  // totals for current ISO week
-  const now    = new Date();
-  const weekNo = getWeek(now);
-  let minsThisWeek = 0;
-  let kmThisWeek   = 0;
-  const activityTotals = {}; // minutes per type
+// src/utils/aggregate.js
+export function aggregateByDay(entries = [], rangeDays = 7) {
+  const cutoff = Date.now() - (rangeDays - 1) * 864e5; // ms per day
+  const dayMap = {};
 
-  entries.forEach(e => {
-    if (getWeek(new Date(e.date)) === weekNo) {
-      e.segments.forEach(s => {
-        const dur = Number(s.duration || 0);
-        minsThisWeek += dur;
-        if (s.type === 'Run' || s.type === 'Bike' || s.type === 'Cycle')
-          kmThisWeek += Number(s.distance || 0);
-      });
-    }
-    e.segments.forEach(s => {
-      activityTotals[s.type] = (activityTotals[s.type] || 0) + Number(s.duration || 0);
+  for (const entry of entries) {
+    const ts = new Date(entry.date).getTime();
+    if (ts < cutoff) continue;
+
+    const key = new Date(ts).toLocaleDateString("en-GB", {
+      month: "2-digit",
+      day:   "2-digit",
     });
-  });
 
-  return { minsThisWeek, kmThisWeek, activityTotals };
-}
+    if (!dayMap[key]) {
+      dayMap[key] = { date: key, totalDistance: 0, totalDuration: 0 };
+    }
 
-function getWeek(d) {
-  const onejan = new Date(d.getFullYear(), 0, 1);
-  return Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+    (entry.segments || []).forEach((seg) => {
+      dayMap[key].totalDistance += Number(seg.distance || 0);
+      dayMap[key].totalDuration += Number(seg.duration || 0);
+    });
+  }
+
+  return Object.values(dayMap).sort(
+    (a, b) => new Date(a.date) - new Date(b.date)
+  );
 }
